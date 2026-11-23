@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Vault プロトタイプ v3</title>
+<style>
+  :root {
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --bg: #f1f5f9;
+    --card: #ffffff;
+    --text: #1e293b;
+    --muted: #64748b;
+    --border: #cbd5e1;
+    --danger: #ef4444;
+  }
+  * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { margin: 0; background: var(--bg); color: var(--text); padding: 12px; font-size: 14px; }
+  .container { max-width: 600px; margin: 0 auto; }
+  
+  /* ロック画面 */
+  .lock-screen { background: var(--card); padding: 28px 20px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); text-align: center; margin-top: 32px; }
+  .lock-screen h1 { margin-top: 0; font-size: 19px; }
+  .lock-screen p { color: var(--muted); font-size: 13px; line-height: 1.5; }
+  
+  /* フォーム要素（iOSで自動ズームされないよう16px維持しつつコンパクトに） */
+  input, textarea, select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; margin-bottom: 10px; background: white; }
+  input:focus, textarea:focus, select:focus { outline: 2px solid var(--primary); border-color: transparent; }
+  
+  /* ボタン */
+  button { cursor: pointer; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; padding: 10px 14px; transition: 0.15s; white-space: nowrap; }
+  .btn-primary { background: var(--primary); color: white; width: 100%; font-size: 14px; }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-outline { background: white; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { background: #f8fafc; }
+  .btn-sm { padding: 6px 10px; font-size: 12px; border-radius: 6px; }
+  .btn-copy { background: #eff6ff; color: var(--primary); border: 1px solid #bfdbfe; }
+  .btn-copy:active { background: var(--primary); color: white; }
+  .btn-danger { background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; }
+
+  /* ヘッダー（1行にスッキリ収める設定） */
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 6px; }
+  .header h2 { margin: 0; font-size: 16px; white-space: nowrap; }
+  .header-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .search-box { margin-bottom: 12px; }
+  .search-box input { margin-bottom: 0; padding: 10px 12px; font-size: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+
+  /* タイトル一覧リスト（Safe風・スリム化） */
+  .list-group { background: var(--card); border-radius: 10px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; }
+  .list-item { display: flex; justify-content: space-between; align-items: center; padding: 13px 14px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.15s; gap: 8px; }
+  .list-item:last-child { border-bottom: none; }
+  .list-item:active, .list-item:hover { background: #f8fafc; }
+  .list-item-title { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.4; }
+  .list-item-arrow { color: #94a3b8; font-size: 16px; font-weight: bold; flex-shrink: 0; }
+
+  /* 個別詳細ページ */
+  .detail-card { background: var(--card); border-radius: 12px; padding: 16px 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+  .detail-title { font-size: 17px; font-weight: 700; margin: 0 0 12px 0; padding-bottom: 10px; border-bottom: 2px solid #f1f5f9; line-height: 1.4; }
+  
+  /* 情報行（ワンタップコピー） */
+  .field-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px dashed #e2e8f0; gap: 8px; }
+  .field-row:last-child { border-bottom: none; }
+  .field-info { flex: 1; min-width: 0; }
+  .field-label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 2px; }
+  .field-value { font-size: 14px; font-family: monospace; word-break: break-all; }
+  .field-actions { display: flex; gap: 5px; flex-shrink: 0; }
+
+  /* モーダル（新規・編集） */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,0.5); display: flex; align-items: center; justify-content: center; padding: 12px; z-index: 100; }
+  .modal { background: white; border-radius: 14px; width: 100%; max-width: 500px; max-height: 92vh; overflow-y: auto; padding: 18px; }
+  .modal h3 { margin-top: 0; font-size: 16px; margin-bottom: 14px; }
+  .field-caption { font-size: 12px; font-weight: bold; display: block; margin-bottom: 4px; color: #334155; }
+  
+  /* パスワード生成バー */
+  .pw-input-group { display: flex; gap: 6px; margin-bottom: 10px; align-items: stretch; }
+  .pw-input-group input { margin-bottom: 0; flex: 1; min-width: 0; font-size: 14px; }
+  .pw-input-group select { margin-bottom: 0; width: auto; padding: 6px 8px; font-size: 12px; flex-shrink: 0; }
+
+  .extra-item-box { background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 8px; }
+  .extra-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; font-weight: bold; }
+
+  /* トースト通知 */
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 8px 18px; border-radius: 99px; font-size: 13px; opacity: 0; pointer-events: none; transition: 0.25s; z-index: 200; box-shadow: 0 4px 12px rgba(0,0,0,0.2); white-space: nowrap; }
+  .toast.show { opacity: 1; bottom: 28px; }
+  .hidden { display: none !important; }
+  .sync-bar { background: #fffbeb; border: 1px solid #fde68a; padding: 8px 12px; border-radius: 8px; font-size: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 1. ロック解除画面 -->
+  <div id="lockScreen" class="lock-screen">
+    <h1>🔐 My Vault (試作版 v3)</h1>
+    <p>マスターパスワードを入力して開始します。<br>※初回は好きなパスワードを決めて「開く」を押してください。</p>
+    <input type="password" id="masterPasswordInput" placeholder="マスターパスワードを入力">
+    <button class="btn-primary" onclick="unlockVault()">ロック解除 / 新規作成</button>
+    <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid #e2e8f0;">
+      <p style="font-size: 11px; margin-bottom: 6px;">すでに保存した暗号化ファイル（.vault）がある場合：</p>
+      <input type="file" id="importFile" accept=".vault,.json" style="font-size: 12px; padding: 6px;" onchange="loadEncryptedFile(event)">
+    </div>
+  </div>
+
+  <!-- 2. 一覧画面（タイトルのみリスト） -->
+  <div id="listScreen" class="hidden">
+    <div class="header">
+      <h2>🔐 パスワード一覧</h2>
+      <div class="header-actions">
+        <button class="btn-outline btn-sm" onclick="exportEncryptedFile()">💾 保存</button>
+        <button class="btn-outline btn-sm" onclick="lockVault()">🔒 ロック</button>
+      </div>
+    </div>
+
+    <div class="sync-bar">
+      <span>全 <strong id="totalCount">0</strong> 件</span>
+      <button class="btn-primary btn-sm" style="width:auto;" onclick="openModal()">＋ 新規登録</button>
+    </div>
+
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="🔍 サービス名・タイトルで検索..." oninput="renderList()">
+    </div>
+
+    <div id="entryList" class="list-group"></div>
+  </div>
+
+  <!-- 3. 個別詳細ページ -->
+  <div id="detailScreen" class="hidden">
+    <div class="header">
+      <button class="btn-outline btn-sm" onclick="showListScreen()">← 一覧へ戻る</button>
+      <div class="header-actions">
+        <button class="btn-outline btn-sm" id="detailEditBtn">編集</button>
+        <button class="btn-danger btn-sm" id="detailDeleteBtn">削除</button>
+      </div>
+    </div>
+
+    <div id="detailContent" class="detail-card"></div>
+  </div>
+</div>
+
+<!-- 4. 登録・編集モーダル -->
+<div id="entryModal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h3 id="modalTitle">新規登録</h3>
+    <input type="hidden" id="editId">
+
+    <label class="field-caption">サービス名・タイトル *</label>
+    <input type="text" id="fieldTitle" placeholder="例：〇〇銀行 ネットバンキング">
+
+    <label class="field-caption">ログインID / メールアドレス</label>
+    <input type="text" id="fieldUserId" placeholder="例：user@example.com">
+
+    <label class="field-caption">メインパスワード</label>
+    <div class="pw-input-group">
+      <input type="text" id="fieldPassword" placeholder="入力または自動生成">
+      <select id="pwLengthSelect" title="生成する文字数"></select>
+      <button type="button" class="btn-outline btn-sm" onclick="generatePassword('fieldPassword')">🎲 生成</button>
+    </div>
+
+    <!-- 追加のパスワード・PIN・暗証番号エリア -->
+    <div style="margin: 14px 0;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <span class="field-caption" style="margin-bottom:0;">追加の暗証番号・PINなど</span>
+        <button type="button" class="btn-outline btn-sm" onclick="addExtraFieldRow()">＋ 項目追加</button>
+      </div>
+      <div id="extraFieldsContainer"></div>
+    </div>
+
+    <label class="field-caption">URL</label>
+    <input type="text" id="fieldUrl" placeholder="https://...">
+
+    <label class="field-caption">メモ</label>
+    <textarea id="fieldMemo" rows="2" placeholder="支店番号や契約者番号など"></textarea>
+
+    <div style="display:flex; gap:8px; margin-top:14px;">
+      <button type="button" class="btn-outline" style="flex:1;" onclick="closeModal()">キャンセル</button>
+      <button type="button" class="btn-primary" style="flex:1;" onclick="saveEntry()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast">コピーしました</div>
+
+<script>
+  let vaultData = [];
+  let loadedEncryptedBlob = null;
+  let currentDetailId = null;
+
+  // 桁数プルダウン（6桁〜20桁、初期値16桁）の初期化
+  (function initLengthSelect() {
+    const sel = document.getElementById("pwLengthSelect");
+    for (let i = 6; i <= 20; i++) {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = `${i}桁`;
+      if (i === 16) opt.selected = true;
+      sel.appendChild(opt);
+    }
+  })();
+
+  const sampleData = [
+    {
+      id: "sample-1",
+      title: "サンプル銀行（タップして詳細へ）",
+      userId: "1234-567890",
+      password: "PassWord1234!",
+      extras: [
+        { label: "取引暗証番号", value: "9876", secret: true },
+        { label: "テレホンバンキングPIN", value: "4321", secret: true }
+      ],
+      url: "https://example.com",
+      memo: "一覧からタイトルをタップすると、この個別ページが開きます。"
+    }
+  ];
+
+  // --- パスワード自動生成（6〜20桁指定） ---
+  function generatePassword(targetInputId) {
+    const length = parseInt(document.getElementById("pwLengthSelect").value, 10) || 16;
+    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*_-+=";
+    const array = new Uint32Array(length);
+    crypto.getRandomValues(array);
+    let pw = "";
+    for (let i = 0; i < length; i++) {
+      pw += charset[array[i] % charset.length];
+    }
+    document.getElementById(targetInputId).value = pw;
+    showToast(`${length}桁のパスワードを生成しました`);
+  }
+
+  // --- 暗号化・復号ロジック (Web Crypto API / AES-256-GCM) ---
+  async function deriveKey(password, salt) {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt: salt, iterations: 100000, hash: "SHA-256" },
+      keyMaterial,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  }
+
+  async function encryptVault(dataObj, password) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(password, salt);
+    const enc = new TextEncoder();
+    const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, enc.encode(JSON.stringify(dataObj)));
+    
+    return JSON.stringify({
+      version: 3,
+      salt: btoa(String.fromCharCode(...salt)),
+      iv: btoa(String.fromCharCode(...iv)),
+      data: btoa(String.fromCharCode(...new Uint8Array(ciphertext)))
+    });
+  }
+
+  async function decryptVault(encryptedJsonStr, password) {
+    const parsed = JSON.parse(encryptedJsonStr);
+    const salt = Uint8Array.from(atob(parsed.salt), c => c.charCodeAt(0));
+    const iv = Uint8Array.from(atob(parsed.iv), c => c.charCodeAt(0));
+    const ciphertext = Uint8Array.from(atob(parsed.data), c => c.charCodeAt(0));
+    const key = await deriveKey(password, salt);
+    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, ciphertext);
+    return JSON.parse(new TextDecoder().decode(decrypted));
+  }
+
+  // --- ロック・解除処理 ---
+  async function unlockVault() {
+    const pw = document.getElementById("masterPasswordInput").value;
+    if (!pw) { alert("マスターパスワードを入力してください"); return; }
+
+    try {
+      const savedStr = loadedEncryptedBlob || localStorage.getItem("proto_vault_data_v3");
+      if (savedStr) {
+        vaultData = await decryptVault(savedStr, pw);
+      } else {
+        vaultData = sampleData;
+        await saveToLocalStorage(pw);
+      }
+      window._currentPw = pw;
+      document.getElementById("lockScreen").classList.add("hidden");
+      showListScreen();
+    } catch (e) {
+      alert("パスワードが違うか、ファイルが破損しています。");
+    }
+  }
+
+  function lockVault() {
+    window._currentPw = null;
+    vaultData = [];
+    currentDetailId = null;
+    document.getElementById("masterPasswordInput").value = "";
+    document.getElementById("listScreen").classList.add("hidden");
+    document.getElementById("detailScreen").classList.add("hidden");
+    document.getElementById("lockScreen").classList.remove("hidden");
+  }
+
+  async function saveToLocalStorage(pw = window._currentPw) {
+    const encrypted = await encryptVault(vaultData, pw);
+    localStorage.setItem("proto_vault_data_v3", encrypted);
+  }
+
+  // --- ファイル入出力 ---
+  async function exportEncryptedFile() {
+    const encrypted = await encryptVault(vaultData, window._currentPw);
+    const blob = new Blob([encrypted], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "my_passwords.vault";
+    a.click();
+    showToast("暗号化ファイルをダウンロードしました");
+  }
+
+  function loadEncryptedFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      loadedEncryptedBlob = e.target.result;
+      showToast("ファイルを読み込みました。パスワードを入力してください");
+    };
+    reader.readAsText(file);
+  }
+
+  // --- 画面切り替え（一覧 ⇔ 個別詳細） ---
+  function showListScreen() {
+    currentDetailId = null;
+    document.getElementById("detailScreen").classList.add("hidden");
+    document.getElementById("listScreen").classList.remove("hidden");
+    renderList();
+  }
+
+  function showDetailScreen(id) {
+    const item = vaultData.find(x => x.id === id);
+    if (!item) return;
+    currentDetailId = id;
+
+    document.getElementById("listScreen").classList.add("hidden");
+    document.getElementById("detailScreen").classList.remove("hidden");
+
+    document.getElementById("detailEditBtn").onclick = () => openModal(item.id);
+    document.getElementById("detailDeleteBtn").onclick = () => deleteEntry(item.id);
+
+    let extrasHtml = "";
+    if (item.extras && item.extras.length > 0) {
+      item.extras.forEach((ex, idx) => {
+        const maskId = `mask_${item.id}_${idx}`;
+        const valDisplay = ex.secret ? "••••••••" : escapeHtml(ex.value);
+        extrasHtml += `
+          <div class="field-row">
+            <div class="field-info">
+              <span class="field-label">${escapeHtml(ex.label)}</span>
+              <div class="field-value" id="${maskId}" data-real="${escapeHtml(ex.value)}" data-hidden="${ex.secret}">${valDisplay}</div>
+            </div>
+            <div class="field-actions">
+              ${ex.secret ? `<button class="btn-outline btn-sm" onclick="toggleSecret('${maskId}')">👁️</button>` : ""}
+              <button class="btn-copy btn-sm" onclick="copyText('${escapeJs(ex.value)}', '${escapeJs(ex.label)}')">コピー</button>
+            </div>
+          </div>`;
+      });
+    }
+
+    const pwMaskId = `pw_${item.id}`;
+    document.getElementById("detailContent").innerHTML = `
+      <h3 class="detail-title">${escapeHtml(item.title)}</h3>
+      ${item.userId ? `
+      <div class="field-row">
+        <div class="field-info">
+          <span class="field-label">ログインID</span>
+          <div class="field-value">${escapeHtml(item.userId)}</div>
+        </div>
+        <div class="field-actions">
+          <button class="btn-copy btn-sm" onclick="copyText('${escapeJs(item.userId)}', 'ID')">コピー</button>
+        </div>
+      </div>` : ""}
+      ${item.password ? `
+      <div class="field-row">
+        <div class="field-info">
+          <span class="field-label">パスワード</span>
+          <div class="field-value" id="${pwMaskId}" data-real="${escapeHtml(item.password)}" data-hidden="true">••••••••</div>
+        </div>
+        <div class="field-actions">
+          <button class="btn-outline btn-sm" onclick="toggleSecret('${pwMaskId}')">👁️</button>
+          <button class="btn-copy btn-sm" onclick="copyText('${escapeJs(item.password)}', 'パスワード')">コピー</button>
+        </div>
+      </div>` : ""}
+      ${extrasHtml}
+      ${item.url ? `
+      <div class="field-row">
+        <div class="field-info">
+          <span class="field-label">URL</span>
+          <div class="field-value"><a href="${escapeHtml(item.url)}" target="_blank" style="color:var(--primary);">${escapeHtml(item.url)}</a></div>
+        </div>
+      </div>` : ""}
+      ${item.memo ? `
+      <div class="field-row">
+        <div class="field-info">
+          <span class="field-label">メモ</span>
+          <div class="field-value" style="font-family:sans-serif; font-size:13px; white-space:pre-wrap;">${escapeHtml(item.memo)}</div>
+        </div>
+      </div>` : ""}
+    `;
+  }
+
+  // --- 一覧描画・検索 ---
+  function renderList() {
+    const query = document.getElementById("searchInput").value.toLowerCase();
+    const listEl = document.getElementById("entryList");
+    document.getElementById("totalCount").textContent = vaultData.length;
+    listEl.innerHTML = "";
+
+    const filtered = vaultData.filter(item => {
+      const text = `${item.title} ${item.userId} ${item.memo}`.toLowerCase();
+      return text.includes(query);
+    });
+
+    if (filtered.length === 0) {
+      listEl.innerHTML = `<p style="text-align:center; color:#64748b; padding:20px; margin:0; font-size:13px;">該当するデータがありません</p>`;
+      return;
+    }
+
+    filtered.forEach(item => {
+      const row = document.createElement("div");
+      row.className = "list-item";
+      row.onclick = () => showDetailScreen(item.id);
+      row.innerHTML = `
+        <span class="list-item-title">${escapeHtml(item.title)}</span>
+        <span class="list-item-arrow">›</span>
+      `;
+      listEl.appendChild(row);
+    });
+  }
+
+  function toggleSecret(elementId) {
+    const el = document.getElementById(elementId);
+    const isHidden = el.getAttribute("data-hidden") === "true";
+    if (isHidden) {
+      el.textContent = el.getAttribute("data-real");
+      el.setAttribute("data-hidden", "false");
+    } else {
+      el.textContent = "••••••••";
+      el.setAttribute("data-hidden", "true");
+    }
+  }
+
+  function copyText(text, labelName) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast(`「${labelName}」をコピーしました`);
+    });
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2000);
+  }
+
+  // --- モーダル（追加・編集） ---
+  function openModal(id = null) {
+    const container = document.getElementById("extraFieldsContainer");
+    container.innerHTML = "";
+    
+    if (id) {
+      const item = vaultData.find(x => x.id === id);
+      document.getElementById("modalTitle").textContent = "情報の編集";
+      document.getElementById("editId").value = item.id;
+      document.getElementById("fieldTitle").value = item.title || "";
+      document.getElementById("fieldUserId").value = item.userId || "";
+      document.getElementById("fieldPassword").value = item.password || "";
+      document.getElementById("fieldUrl").value = item.url || "";
+      document.getElementById("fieldMemo").value = item.memo || "";
+      (item.extras || []).forEach(ex => addExtraFieldRow(ex.label, ex.value, ex.secret));
+    } else {
+      document.getElementById("modalTitle").textContent = "新規登録";
+      document.getElementById("editId").value = "";
+      document.getElementById("fieldTitle").value = "";
+      document.getElementById("fieldUserId").value = "";
+      document.getElementById("fieldPassword").value = "";
+      document.getElementById("fieldUrl").value = "";
+      document.getElementById("fieldMemo").value = "";
+    }
+    document.getElementById("entryModal").classList.remove("hidden");
+  }
+
+  function closeModal() {
+    document.getElementById("entryModal").classList.add("hidden");
+  }
+
+  function addExtraFieldRow(label = "", value = "", secret = true) {
+    const container = document.getElementById("extraFieldsContainer");
+    const div = document.createElement("div");
+    div.className = "extra-item-box";
+    div.innerHTML = `
+      <div class="extra-item-header">
+        <span>追加項目（PIN・暗証番号など）</span>
+        <button type="button" class="btn-danger btn-sm" style="padding:2px 8px;" onclick="this.closest('.extra-item-box').remove()">削除</button>
+      </div>
+      <input type="text" class="ex-label" placeholder="項目名（例：取引暗証番号、PINコード）" value="${escapeHtml(label)}" style="margin-bottom:6px; font-size:14px;">
+      <input type="text" class="ex-value" placeholder="番号や値" value="${escapeHtml(value)}" style="margin-bottom:6px; font-size:14px;">
+      <label style="font-size:12px; display:flex; align-items:center; gap:6px; cursor:pointer;">
+        <input type="checkbox" class="ex-secret" ${secret ? "checked" : ""} style="width:auto; margin:0;"> 普段は「••••」で隠す
+      </label>
+    `;
+    container.appendChild(div);
+  }
+
+  async function saveEntry() {
+    const title = document.getElementById("fieldTitle").value.trim();
+    if (!title) { alert("サービス名・タイトルは必須です"); return; }
+
+    const extras = [];
+    document.querySelectorAll(".extra-item-box").forEach(box => {
+      const label = box.querySelector(".ex-label").value.trim();
+      const value = box.querySelector(".ex-value").value;
+      const secret = box.querySelector(".ex-secret").checked;
+      if (label || value) {
+        extras.push({ label: label || "追加項目", value, secret });
+      }
+    });
+
+    const editId = document.getElementById("editId").value;
+    const newItem = {
+      id: editId || "id-" + Date.now(),
+      title: title,
+      userId: document.getElementById("fieldUserId").value.trim(),
+      password: document.getElementById("fieldPassword").value,
+      extras: extras,
+      url: document.getElementById("fieldUrl").value.trim(),
+      memo: document.getElementById("fieldMemo").value
+    };
+
+    if (editId) {
+      const idx = vaultData.findIndex(x => x.id === editId);
+      vaultData[idx] = newItem;
+    } else {
+      vaultData.unshift(newItem);
+    }
+
+    await saveToLocalStorage();
+    closeModal();
+    
+    if (editId && currentDetailId === editId) {
+      showDetailScreen(editId);
+    } else {
+      showListScreen();
+    }
+    showToast("保存しました");
+  }
+
+  async function deleteEntry(id) {
+    if (!confirm("このデータを削除してもよろしいですか？")) return;
+    vaultData = vaultData.filter(x => x.id !== id);
+    await saveToLocalStorage();
+    showListScreen();
+    showToast("削除しました");
+  }
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return str.replace(/[&<>"']/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m]));
+  }
+  function escapeJs(str) {
+    if (!str) return "";
+    return str.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  }
+</script>
+</body>
+</html>
